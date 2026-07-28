@@ -27,8 +27,20 @@ class AppContext:
     ledger: Any = None            # SessionTokenLedger
 
     @classmethod
-    def bootstrap(cls) -> "AppContext":
-        """Wire all real components and return a fully initialised AppContext."""
+    def bootstrap(
+        cls,
+        *,
+        event_bus: Any = None,
+        ledger: Any = None,
+    ) -> "AppContext":
+        """Wire all real components and return a fully initialised AppContext.
+
+        ``event_bus`` / ``ledger`` may be injected to bypass the Qt-backed
+        implementations (``EventBus`` / ``SessionTokenLedger`` are ``QObject``
+        subclasses and require a running ``QApplication``). The web server passes
+        Qt-free duck-type shims so it can bootstrap without PyQt6. Defaults keep
+        the original GUI behaviour untouched.
+        """
         from pa_agent.config.paths import (
             SETTINGS_JSON_PATH,
             RECORDS_PENDING_DIR,
@@ -37,14 +49,12 @@ class AppContext:
         )
         from pa_agent.config.settings import load_settings
         from pa_agent.util.logging import configure_logging, update_api_key
-        from pa_agent.util.event_bus import EventBus
         from pa_agent.util.mask_secret import mask_secret
         from pa_agent.data.factory import create_data_source, normalize_data_source_kind
         from pa_agent.ai.client_factory import create_ai_client
         from pa_agent.ai.prompt_assembler import PromptAssembler
         from pa_agent.ai.router import route_strategy_files
         from pa_agent.ai.json_validator import JsonValidator
-        from pa_agent.ai.session_ledger import SessionTokenLedger
         from pa_agent.records.pending_writer import PendingWriter
         from pa_agent.records.experience_reader import ExperienceReader
 
@@ -64,7 +74,10 @@ class AppContext:
         app_logger = logging.getLogger("pa_agent")
 
         # ── Event bus ─────────────────────────────────────────────────────────
-        event_bus = EventBus()
+        if event_bus is None:
+            from pa_agent.util.event_bus import EventBus
+
+            event_bus = EventBus()
 
         # ── Data layer ────────────────────────────────────────────────────────
         from pa_agent.data.kline_adjust import apply_kline_adjust_from_settings
@@ -123,10 +136,13 @@ class AppContext:
         )
 
         # ── Session ledger ────────────────────────────────────────────────────
-        ledger = SessionTokenLedger(
-            context_window=settings.provider.context_window,
-            warn_pct=settings.general.context_warning_threshold_pct,
-        )
+        if ledger is None:
+            from pa_agent.ai.session_ledger import SessionTokenLedger
+
+            ledger = SessionTokenLedger(
+                context_window=settings.provider.context_window,
+                warn_pct=settings.general.context_warning_threshold_pct,
+            )
 
         return cls(
             settings=settings,
