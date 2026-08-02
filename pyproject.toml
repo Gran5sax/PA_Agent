@@ -45,6 +45,7 @@ web = [
     "uvicorn[standard]>=0.29",
     "websockets>=12",
     "anyio>=4",
+    "requests>=2.31",
 ]
 
 [project.scripts]

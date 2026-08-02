@@ -163,6 +163,46 @@ class AnalysisBridge:
             settings=c.settings,
         )
 
+    def _spawn_order_notify(self, decision: Any, rec: Any, start_msg: dict) -> None:
+        """Push the order signal to Feishu/PushPlus on a daemon thread.
+
+        Mirrors gui/main_window.py:_spawn_post_order_followup. Run off the
+        executor thread so the synchronous HTTP calls (Feishu 12s + PushPlus 15s)
+        don't delay the WS ``_done`` frame. Web has no chart PNG, so Feishu falls
+        back to a text card. Both notifiers no-op when their settings
+        (webhook_url / token) are unset, so this is safe to always call.
+        """
+        import threading
+
+        def _notify() -> None:
+            try:
+                sym = start_msg.get("symbol", "")
+                tf = start_msg.get("timeframe", "")
+                st = self._ctx.settings
+                stage2_full = rec.stage2_decision or {}
+                from pa_agent.notify.feishu_notifier import send_order_signal as send_feishu
+
+                send_feishu(
+                    decision_inner=decision,
+                    stage2_full=stage2_full,
+                    symbol=sym,
+                    timeframe=tf,
+                    settings=st,
+                )
+                from pa_agent.notify.pushplus_notifier import send_order_signal as send_pushplus
+
+                send_pushplus(
+                    decision_inner=decision,
+                    stage2_full=stage2_full,
+                    symbol=sym,
+                    timeframe=tf,
+                    settings=st,
+                )
+            except Exception:  # noqa: BLE001
+                logger.warning("order notify failed", exc_info=True)
+
+        threading.Thread(target=_notify, daemon=True, name="web-order-notify").start()
+
     def _build_frame(self, start_msg: dict) -> Any:
         from pa_agent.data.snapshot import build_analysis_frame
         from pa_agent.util.timefmt import now_local_ms
@@ -261,6 +301,7 @@ class AnalysisBridge:
                 threshold = self._ctx.settings.general.decision_confidence_threshold
                 if _has_order_opportunity(decision, threshold):
                     _emit({"type": "order_opportunity", "decision": decision})
+                    self._spawn_order_notify(decision, rec, start_msg)
             except Exception as exc:  # noqa: BLE001
                 logger.exception("analysis run failed")
                 _emit({"type": "error", "message": f"{type(exc).__name__}: {exc}"})

@@ -13,7 +13,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from pa_agent.web.api import analysis, chat, health, kline, records, settings as settings_api
+from pa_agent.web.api import analysis, chat, decision_tree, health, kline, records, settings as settings_api
 from pa_agent.web.bootstrap import web_bootstrap
 from pa_agent.web.bridge import AnalysisBridge
 from pa_agent.web.sessions import SessionRegistry
@@ -60,6 +60,7 @@ def create_app(*, dev: bool = False) -> FastAPI:
     app.include_router(chat.router)
     app.include_router(settings_api.router)
     app.include_router(records.router)
+    app.include_router(decision_tree.router)
 
     # SPA catch-all must be mounted last (after /api and /ws routes).
     mount_spa(app)

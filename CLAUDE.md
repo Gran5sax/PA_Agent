@@ -5,7 +5,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## 项目概述
 
-PA Agent 是一个 **PyQt6 桌面 K 线价格行为（Price Action）AI 辅助决策工具**。它从数据源（MT5 / TradingView / AkShare / EastMoney / Baostock / Tushare / yfinance）读取结构化 K 线与预计算特征，喂给大模型做**两阶段分析**：阶段一「市场诊断」→ 阶段二「交易决策」。
+PA Agent 是一个 **价格行为（Price Action）AI 辅助决策工具**，从数据源（MT5 / TradingView / AkShare / EastMoney / Baostock / Tushare / yfinance）读取结构化 K 线与预计算特征，喂给大模型做**两阶段分析**：阶段一「市场诊断」→ 阶段二「交易决策」。
+
+提供**两套并存的 UI**（共享同一后端分析层 `AppContext`，互不影响）：
+- **PyQt6 桌面 GUI**（`python -m pa_agent.main`）—— 原生窗口，pyqtgraph K线 + 赛博风决策树可视化。
+- **Web 版**（`python run_web.py` 或 `python -m pa_agent.web`）—— 本地 FastAPI + React，浏览器访问；详见下文「Web 版」章节。macOS 无 MT5 时用 Web 版 + 东方财富/AkShare 最顺。
 
 **硬性边界（务必记住）**：
 - 不做截图识图 —— 送入模型的是 K 线表 + 特征表，不是图片。
@@ -26,8 +30,10 @@ pa-agent                     # console script（pyproject [project.scripts]）
 
 # 启动 Web 版（FastAPI + React，本地浏览器，与 GUI 并存）
 pip install -e ".[web]"                  # 装 fastapi/uvicorn/websockets/anyio
+python run_web.py                        # 项目根启动入口（PyCharm 友好，等价下行）
 python -m pa_agent.web                   # 起 127.0.0.1:8765 并自动开浏览器
 pa-agent-web                             # 等价 console script
+#   常用参数：--no-browser（调试不弹浏览器）/ --dev（前端热更新时开 CORS）/ --port 8765
 # 前端开发态（热更新）：cd web_frontend && npm install && npm run dev，另起 python -m pa_agent.web --dev
 # 前端生产构建：cd web_frontend && npm run build → 产物 pa_agent/web/static_dist/ 由 FastAPI serve
 
@@ -113,13 +119,13 @@ make uv-lint
 
 ## Web 版（FastAPI + React，与 PyQt6 GUI 并存）
 
-另一套 UI：本地 FastAPI 后端 + React SPA（`web_frontend/`），`python -m pa_agent.web` 启动后自动开浏览器。两套 UI 共享同一后端分析层（`AppContext`），互不影响。
+另一套 UI：本地 FastAPI 后端 + React SPA（`web_frontend/`），`python run_web.py` / `python -m pa_agent.web` 启动后自动开浏览器（PyCharm 里把 `run_web.py` 设为 Script path 即可调试）。两套 UI 共享同一后端分析层（`AppContext`），互不影响。默认 provider 已在 `config/settings.json` 配 DeepSeek（`model=deepseek-reasoner` + api_key，gitignore 不入库）；网页「⚙ 设置」可改。
 
 - **后端** `pa_agent/web/`：`app.py`（FastAPI + lifespan）、`bootstrap.py`（`web_bootstrap()` 注入 Qt-free shim）、`bridge.py`（`AnalysisBridge`：线程池跑同步 `TwoStageOrchestrator.submit()` + `asyncio.Queue` + `loop.call_soon_threadsafe` 桥接 8 回调到 WebSocket；`run_chat` 锚定 `_last_record` 跑 `FreeChatSession`）、`data_source.py`（运行时切数据源）、`sessions.py`（CancelToken 注册表）、`api/{kline,analysis,chat,settings,records,health}.py`。
 - **Qt 解耦**：`AppContext.bootstrap(*, event_bus=, ledger=)` 接受可选注入；web 传 `NullEventBus`/`WebTokenLedger`（`shims.py`，duck-type），**web 进程零 Qt**。GUI 默认路径不变。
 - **数据源**：`GET /api/data-sources` 返回 7 源，**东方财富 + AkShare 标记 primary 置前**；`/api/kline?source=` 运行时切换 `ctx.data_source`。所有同步数据源调用走 `asyncio.to_thread`，不阻塞事件循环。
 - **流式协议**：`WS /ws/analyze`（start → lifecycle/stage_prompt/reasoning_chunk/content_chunk/stage2_files/record_ready/order_opportunity/error）、`WS /ws/chat`（追问）、`POST /api/analyze/cancel`（协作式 CancelToken，下一 chunk 边界生效）。增量分析复用 `records/analysis_history.py`。
 - **前端** `web_frontend/`（React+Vite+TS）：lightweight-charts K线、zustand 流式状态、`useAnalysisStream`/`useChatStream`/`useKline`（含实时轮询）、决策面板/决策树降级/下单警报/设置对话框/记录回放。`vite.config.ts` proxy `/api`+`/ws`。
-- **已知限制/后置**：keep_analysis 持续跟踪（新 K 线收盘自动触发）、赛博风决策树动画、演示回放器、飞书/PushPlus 推送未做；多窗口并发受 data_source 单订阅限制（单用户场景够用）。
+- **已完成 / 未完成清单**：详见根目录 `todo.md`（后置项含 keep_analysis 持续跟踪、赛博风决策树动画、演示回放器、飞书/PushPlus 推送、实时 K线 WS、web 层正式测试、多窗口并发隔离等）。多窗口并发受 data_source 单订阅限制（单用户场景够用）。
 
 > web 后端**不 import `pa_agent.gui.*`**（gui 包 import PyQt6）；需要的纯逻辑（如 `has_order_opportunity`）在 web 内联镜像，保持 web 无 Qt。改 `gui/` 纯函数时同步检查 `web/` 镜像。
