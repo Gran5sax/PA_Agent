@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import type { AnalysisRecord, ChatMessage, KlineResponse } from '../api/types'
 
 export type Stage = 'stage1' | 'stage2'
 export type Phase = 'idle' | 'running' | 'done' | 'error' | 'cancelled'
@@ -17,6 +18,7 @@ interface AnalysisState {
   stage2Files: string[]
   lifecycle: string[]
   record: Record<string, unknown> | null
+  replayKline: KlineResponse | null
   orderAlert: Record<string, unknown> | null
   error: string | null
 
@@ -27,6 +29,8 @@ interface AnalysisState {
   setStage2Files: (f: string[]) => void
   pushLifecycle: (event: string) => void
   setRecord: (r: Record<string, unknown>) => void
+  loadRecord: (rec: AnalysisRecord) => void
+  setReplayKline: (k: KlineResponse | null) => void
   setOrderAlert: (d: Record<string, unknown>) => void
   clearOrderAlert: () => void
   setError: (message: string) => void
@@ -48,6 +52,19 @@ const LIFECYCLE_TO_PHASE: Record<string, Phase> = {
   Stage2Failed: 'error',
 }
 
+function extractPrompt(messages?: ChatMessage[]): StagePrompt | null {
+  if (!messages || messages.length === 0) return null
+  const system = messages
+    .filter((m) => m.role === 'system')
+    .map((m) => m.content)
+    .join('\n\n')
+  const user = messages
+    .filter((m) => m.role === 'user')
+    .map((m) => m.content)
+    .join('\n\n')
+  return { system, user }
+}
+
 const fresh = () => ({
   reasoning: emptyStr(),
   content: emptyStr(),
@@ -55,6 +72,7 @@ const fresh = () => ({
   stage2Files: [] as string[],
   lifecycle: [] as string[],
   record: null,
+  replayKline: null,
   orderAlert: null,
   error: null,
 })
@@ -82,6 +100,29 @@ export const useAnalysisStore = create<AnalysisState>((set) => ({
       phase: LIFECYCLE_TO_PHASE[event] ?? s.phase,
     })),
   setRecord: (r) => set({ record: r }),
+  loadRecord: (rec) =>
+    set({
+      record: rec as unknown as Record<string, unknown>,
+      replayKline: null,
+      phase: 'done',
+      analysisId: String(rec.meta?.timestamp_local_ms ?? 'replay'),
+      reasoning: {
+        stage1: rec.stage1_response?.reasoning_content ?? '',
+        stage2: rec.stage2_response?.reasoning_content ?? '',
+      },
+      content: {
+        stage1: rec.stage1_response?.content ?? '',
+        stage2: rec.stage2_response?.content ?? '',
+      },
+      stagePrompt: {
+        stage1: extractPrompt(rec.stage1_messages),
+        stage2: extractPrompt(rec.stage2_messages),
+      },
+      stage2Files: rec.strategy_files_used ?? [],
+      lifecycle: ['Stage1Started', 'Stage1Done', 'Stage2Started', 'Stage2Done', 'RecordSaved'],
+      error: null,
+    }),
+  setReplayKline: (k) => set({ replayKline: k }),
   setOrderAlert: (d) => set({ orderAlert: d }),
   clearOrderAlert: () => set({ orderAlert: null }),
   setError: (message) => set({ error: message, phase: 'error' }),

@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import { api } from '../../api/client'
 import { useAnalysisStore } from '../../store/analysisStore'
-import type { RecordSummary } from '../../api/types'
+import { computeIndicators } from '../../utils/indicators'
+import type { AnalysisRecord, KlineBar, RecordSummary } from '../../api/types'
 
 /** History list + decision replay. Loading a record pushes it into the store so
  * DecisionPanel / DecisionTree / DiagnosisSummary re-render with that record. */
@@ -9,8 +10,8 @@ export function RecordsPanel() {
   const [items, setItems] = useState<RecordSummary[]>([])
   const [open, setOpen] = useState(false)
   const [loadingId, setLoadingId] = useState<string | null>(null)
-  const setRecord = useAnalysisStore((s) => s.setRecord)
-  const setPhase = useAnalysisStore((s) => s.setPhase)
+  const loadRecord = useAnalysisStore((s) => s.loadRecord)
+  const setReplayKline = useAnalysisStore((s) => s.setReplayKline)
 
   const refresh = () => {
     api
@@ -23,9 +24,23 @@ export function RecordsPanel() {
   const load = async (id: string) => {
     setLoadingId(id)
     try {
-      const rec = await api.record(id)
-      setRecord(rec)
-      setPhase('done')
+      const rec = (await api.record(id)) as unknown as AnalysisRecord
+      loadRecord(rec)
+      // Replay the historical K-line: record keeps OHLCV only, so recompute
+      // EMA20/ATR14 client-side (mirrors snapshot.py:compute_indicators).
+      const bars = (rec.kline_data ?? []) as KlineBar[]
+      if (bars.length > 0) {
+        const { ema20, atr14 } = computeIndicators(bars)
+        setReplayKline({
+          symbol: String(rec.meta?.symbol ?? ''),
+          timeframe: String(rec.meta?.timeframe ?? ''),
+          bars,
+          ema20,
+          atr14,
+          forming_bar: null,
+          snapshot_ts_local_ms: Number(rec.meta?.timestamp_ms ?? 0),
+        })
+      }
     } catch {
       /* ignore */
     } finally {

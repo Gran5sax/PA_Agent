@@ -1,7 +1,9 @@
 import type {
   DataSourcesResponse,
+  DecisionTreeStatic,
   HealthResponse,
   KlineResponse,
+  MoneyFlowResponse,
   RecordSummary,
   SymbolsResponse,
   TimeframesResponse,
@@ -50,4 +52,9 @@ export const api = {
     getJson<{ records: RecordSummary[] }>('/api/records').then((r) => r.records),
   record: (id: string) =>
     getJson<Record<string, unknown>>(`/api/records/${encodeURIComponent(id)}`),
+  decisionTree: () => getJson<DecisionTreeStatic>('/api/decision-tree'),
+  moneyFlow: (symbol: string, lmt: number) =>
+    getJson<MoneyFlowResponse>(
+      `/api/money-flow?symbol=${encodeURIComponent(symbol)}&lmt=${lmt}`,
+    ),
 }

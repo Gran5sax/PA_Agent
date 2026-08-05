@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react'
 import { ControlBar } from '../components/control/ControlBar'
-import { KlineChart } from '../components/chart/KlineChart'
+import { KlineChart, type Indicator } from '../components/chart/KlineChart'
 import { StreamPanel } from '../components/stream/StreamPanel'
 import { FlowBar } from '../components/stream/FlowBar'
 import { DecisionPanel } from '../components/decision/DecisionPanel'
 import { DiagnosisSummary } from '../components/decision/DiagnosisSummary'
 import { DecisionTree } from '../components/decision/DecisionTree'
+import { DecisionFlowViz } from '../components/decision/DecisionFlowViz'
 import { OrderAlert } from '../components/decision/OrderAlert'
 import { FreeChat } from '../components/chat/FreeChat'
 import { RecordsPanel } from '../components/records/RecordsPanel'
@@ -31,10 +32,20 @@ export function WorkbenchPage() {
   const { submit, cancel } = useAnalysisStream()
   const phase = useAnalysisStore((s) => s.phase)
   const record = useAnalysisStore((s) => s.record) as AnalysisRecord | null
+  const replayKline = useAnalysisStore((s) => s.replayKline)
+  const setReplayKline = useAnalysisStore((s) => s.setReplayKline)
+  const [mainTab, setMainTab] = useState<'chart' | 'tree'>('chart')
+  const [indicator, setIndicator] = useState<Indicator>('vol')
 
   const stage2 = record?.stage2_decision
   const decision = stage2?.decision ?? null
   const summary = stage2?.diagnosis_summary ?? null
+  const chartData = replayKline ?? data
+
+  // Jump to the K-line tab on replay so the historical candles + decision lines show.
+  useEffect(() => {
+    if (replayKline) setMainTab('chart')
+  }, [replayKline])
 
   useEffect(() => {
     api
@@ -83,7 +94,56 @@ export function WorkbenchPage() {
       {error && <div className="error-banner">数据获取失败：{error}</div>}
       <div className="main-area">
         <div className="chart-pane">
-          <KlineChart data={data} decision={decision} />
+          <div className="main-tabs">
+            <button
+              className={`main-tab${mainTab === 'chart' ? ' active' : ''}`}
+              onClick={() => setMainTab('chart')}
+            >
+              📈 K线
+            </button>
+            <button
+              className={`main-tab${mainTab === 'tree' ? ' active' : ''}`}
+              onClick={() => setMainTab('tree')}
+            >
+              🌳 决策树
+            </button>
+            {mainTab === 'chart' && (
+              <label className="indicator-select-label">
+                指标
+                <select
+                  className="indicator-select"
+                  value={indicator}
+                  onChange={(e) => setIndicator(e.target.value as Indicator)}
+                >
+                  <option value="none">无</option>
+                  <option value="vol">成交量</option>
+                  <option value="kdj">KDJ</option>
+                  <option value="flow">主力资金</option>
+                </select>
+              </label>
+            )}
+            {replayKline && (
+              <button className="main-tab return" onClick={() => setReplayKline(null)}>
+                ↩ 返回实时
+              </button>
+            )}
+          </div>
+          <div className="main-tab-body">
+            {mainTab === 'chart' ? (
+              <KlineChart
+                data={chartData}
+                decision={decision}
+                indicator={indicator}
+                source={source}
+              />
+            ) : (
+              <DecisionFlowViz
+                gateTrace={record?.stage1_diagnosis?.gate_trace}
+                decisionTrace={stage2?.decision_trace}
+                terminal={stage2?.terminal}
+              />
+            )}
+          </div>
         </div>
         <aside className="side-pane">
           <FlowBar />
@@ -91,7 +151,7 @@ export function WorkbenchPage() {
           <DecisionPanel decision={decision} />
           <DecisionTree stage2={stage2 ?? null} />
           <StreamPanel />
-          <FreeChat enabled={!!record} />
+          <FreeChat enabled={!!record} source={source} symbol={symbol} timeframe={timeframe} />
           <RecordsPanel />
           {data && (
             <div className="meta">

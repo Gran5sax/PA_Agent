@@ -71,5 +71,20 @@ export function useChatStream() {
     }
   }, [])
 
-  return { turns, streaming, error, send, cancel }
+  const reset = useCallback(() => {
+    setTurns([])
+    setError(null)
+    setStreaming(false)
+    if (wsRef.current) {
+      try {
+        wsRef.current.close()
+      } catch {
+        /* noop */
+      }
+    }
+    wsRef.current = null
+    sessionIdRef.current = null
+  }, [])
+
+  return { turns, streaming, error, send, cancel, reset }
 }

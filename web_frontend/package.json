@@ -13,7 +13,8 @@
     "react-dom": "^18.3.1",
     "lightweight-charts": "^5.0.0",
     "zustand": "^4.5.5",
-    "clsx": "^2.1.1"
+    "clsx": "^2.1.1",
+    "@xyflow/react": "^12.3.0"
   },
   "devDependencies": {
     "@types/react": "^18.3.12",

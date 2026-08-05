@@ -1,13 +1,26 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useChatStream } from '../../hooks/useChatStream'
+import { useAnalysisStore } from '../../store/analysisStore'
 
 interface Props {
   enabled: boolean
+  source: string
+  symbol: string
+  timeframe: string
 }
 
-export function FreeChat({ enabled }: Props) {
-  const { turns, streaming, error, send, cancel } = useChatStream()
+export function FreeChat({ enabled, source, symbol, timeframe }: Props) {
+  const { turns, streaming, error, send, cancel, reset } = useChatStream()
+  const analysisId = useAnalysisStore((s) => s.analysisId)
   const [text, setText] = useState('')
+
+  // Chat follows the current instrument + analysis session: clear history and
+  // drop the WS whenever the stock / timeframe / analysisId changes, so stale
+  // Q&A from a previous instrument doesn't linger; the next question re-binds
+  // to the latest record on the backend.
+  useEffect(() => {
+    reset()
+  }, [analysisId, source, symbol, timeframe, reset])
 
   if (!enabled) {
     return <div className="muted small">完成一次分析后可在此追问</div>

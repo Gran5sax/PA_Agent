@@ -85,7 +85,19 @@ export interface TraceItem {
   reason?: string
   bar_range?: string
   section?: string
+  branch?: string
+  skipped?: boolean
+  bar_from?: number
+  bar_to?: number
+  next_node?: string
+  overridden_by_ai?: boolean
+  program_answer?: string
+  program_branch?: string
+  override_reason?: string
 }
+
+/** Stage-1 gate trace item (same shape as TraceItem; kept separate for clarity). */
+export type GateTraceItem = TraceItem
 
 export interface Terminal {
   node_id?: string
@@ -103,11 +115,40 @@ export interface Stage2Record {
   next_cycle_prediction?: Record<string, unknown> | null
 }
 
+export interface StageResponse {
+  id?: string
+  model?: string
+  content?: string
+  reasoning_content?: string
+  usage?: Record<string, unknown>
+  latency_ms?: number
+}
+
+export interface ChatMessage {
+  role: string
+  content: string
+}
+
+export interface Stage1Diagnosis {
+  gate_trace?: GateTraceItem[]
+  gate_result?: string
+  [k: string]: unknown
+}
+
 export interface AnalysisRecord {
   meta: Record<string, unknown>
-  stage1_diagnosis?: Record<string, unknown>
+  kline_data?: KlineBar[]
+  htf_text?: string
+  stage1_messages?: ChatMessage[]
+  stage1_response?: StageResponse
+  stage1_diagnosis?: Stage1Diagnosis
+  stage2_messages?: ChatMessage[]
+  stage2_response?: StageResponse
   stage2_decision?: Stage2Record
   strategy_files_used?: string[]
+  experience_loaded?: Record<string, unknown>[]
+  usage_total?: Record<string, unknown>
+  exception?: Record<string, unknown> | null
 }
 export interface HealthResponse {
   status: string
@@ -115,4 +156,45 @@ export interface HealthResponse {
   data_source: string
   symbol: string
   timeframe: string
+}
+
+// ── Static decision tree (mirror ai/decision_tree.py:load_decision_tree) ──
+
+export interface DecisionTreeNode {
+  id: string
+  question: string
+  section_id?: string
+  section_title?: string
+  branch_yes?: string
+  branch_no?: string
+}
+
+export interface DecisionTreeSection {
+  id: string
+  title: string
+  nodes: { id: string; question: string }[]
+}
+
+export interface DecisionTreeStatic {
+  version: number
+  source: string
+  sections: DecisionTreeSection[]
+  node_index: Record<string, DecisionTreeNode>
+}
+
+// ── Money flow (mirror eastmoney_extended._FFLOW_DAILY_NAMES) ──
+
+export interface MoneyFlowItem {
+  date: string // YYYY-MM-DD
+  main_net: number // 主力净流入（元）
+  main_net_pct?: number
+  super_large_net?: number
+  large_net?: number
+  medium_net?: number
+  small_net?: number
+}
+
+export interface MoneyFlowResponse {
+  symbol: string
+  items: MoneyFlowItem[]
 }
