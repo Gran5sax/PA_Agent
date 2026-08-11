@@ -294,8 +294,13 @@ class EastMoneySource(DataSource):
             )
             return _em_rows_to_bars_asc(raw)[-(n + 5) :]
 
-        # A-share stocks: Baostock daily is faster and avoids East Money curl(56) drops.
-        if adjust == "qfq":
+        # A-share stocks: Baostock daily is faster and avoids East Money curl(56)
+        # drops, but it lags — no bar for today after the close. After 15:00 CN go
+        # straight to East Money so the just-closed daily bar shows up; intraday
+        # still uses Baostock (today's forming bar is patched in latest_snapshot).
+        now = _cn_now()
+        after_close = now.weekday() < 5 and now.hour >= 15
+        if adjust == "qfq" and not after_close:
             try:
                 return fetch_daily_history_baostock(symbol, n + 5)
             except Exception as bs_exc:

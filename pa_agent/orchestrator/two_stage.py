@@ -708,6 +708,7 @@ class TwoStageOrchestrator:
             enable_next_bar_prediction=_enable_next_bar,
             provider_settings=getattr(self._settings, "provider", None),
             structure_flip_cooldown_bars=_flip_cooldown,
+            long_only=bool(getattr(self._settings.general, "long_only", False)),
         )
 
         # ── Step 15: Call AI for Stage 2 ──────────────────────────────────────
@@ -857,6 +858,7 @@ class TwoStageOrchestrator:
                 "skip_next_bar": not _enable_next_bar,
                 "previous_record": previous_record,
                 "structure_flip_cooldown_bars": _flip_cooldown,
+                "long_only": bool(getattr(self._settings.general, "long_only", False)),
             },
             call_api=_call_s2_retry,
             provider_settings=getattr(self._settings, "provider", None),

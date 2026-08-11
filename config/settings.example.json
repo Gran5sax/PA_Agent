@@ -19,6 +19,7 @@
     "decision_flow_play_seconds": 50,
     "incremental_max_new_bars": 10,
     "decision_stance": "balanced",
+    "long_only": false,
     "structure_flip_cooldown_bars": 3,
     "decision_flow_default_zoom_pct": 600,
     "stream_pane_font_pt": 11,

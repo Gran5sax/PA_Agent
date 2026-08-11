@@ -1554,6 +1554,7 @@ class PromptAssembler:
         provider_settings: Any | None = None,
         use_prefix_chain: bool | None = None,
         structure_flip_cooldown_bars: int = 3,
+        long_only: bool = False,
     ) -> list[dict]:
         """Build Stage 2 messages, optionally chaining after Stage 1 for KV cache.
 
@@ -1579,6 +1580,7 @@ class PromptAssembler:
             enable_next_bar_prediction=enable_next_bar_prediction,
             omit_kline_block=chain_after_s1,
             structure_flip_cooldown_bars=structure_flip_cooldown_bars,
+            long_only=long_only,
         )
 
         if chain_after_s1:
@@ -1609,6 +1611,7 @@ class PromptAssembler:
         enable_next_bar_prediction: bool = False,
         omit_kline_block: bool = False,
         structure_flip_cooldown_bars: int = 3,
+        long_only: bool = False,
     ) -> str:
         """Build the Stage 2 task turn for standalone or prefix-chain mode."""
         from pa_agent.ai.decision_continuity import (
@@ -1616,7 +1619,9 @@ class PromptAssembler:
             render_continuity_prompt_block,
         )
 
-        stance_block = build_decision_stance_guidance(normalize_stance(decision_stance))
+        stance_block = build_decision_stance_guidance(
+            normalize_stance(decision_stance), long_only=long_only
+        )
         continuity_ctx = build_continuity_context(
             frame=frame,
             stage1_json=stage1_json,

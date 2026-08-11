@@ -43,7 +43,7 @@ def stance_label_zh(stance: str | None) -> str:
     return STANCE_LABELS_ZH.get(normalize_stance(stance), "保守")
 
 
-def build_decision_stance_guidance(stance: str | None) -> str:
+def build_decision_stance_guidance(stance: str | None, *, long_only: bool = False) -> str:
     """Return Stage-2-only guidance block for the current trading stance."""
     normalized = normalize_stance(stance)
     label = stance_label_zh(normalized)
@@ -76,6 +76,14 @@ def build_decision_stance_guidance(stance: str | None) -> str:
         "- 触犯 §14 硬性禁止项时，各档均须 order_type=不下单，"
         "并在 reasoning 明确写出触犯的条款。\n"
     )
+    if long_only:
+        common_rules += (
+            "- **只做多硬约束（long_only=true）**：本账户只做多、不做空。"
+            "禁止任何 order_direction=做空 的方案；direction=bearish 时优先观望或"
+            "等反转做多机会（AIL/底部反转/MTR），不得挂空单。对多头 setup"
+            "（上涨通道/尖峰做多/回撤支撑）门槛更宽松，对空头 setup 严格不计入。"
+            "程序会强制把做空改为不下单。\n"
+        )
 
     if normalized == "conservative":
         profile = (

@@ -936,6 +936,77 @@ def test_prediction_guard_forbids_short_when_next_cycle_bullish() -> None:
     assert "禁止做空" in (out["decision"].get("reasoning") or "")
 
 
+def _long_only_short_obj() -> dict:
+    return {
+        "decision": {
+            "order_type": "限价单",
+            "order_direction": "做空",
+            "entry_price": 4022.486,
+            "take_profit_price": 4015.365,
+            "take_profit_price_2": 4009.473,
+            "stop_loss_price": 4034.234,
+            "reasoning": "test",
+            "diagnosis_confidence": 64,
+            "diagnosis_confidence_reasoning": "t",
+            "trade_confidence": 52,
+            "trade_confidence_reasoning": "t",
+            "estimated_win_rate": 52,
+            "estimated_win_rate_reasoning": "t",
+            "key_factors": [],
+            "watch_points": [],
+            "risk_assessment": "t",
+            "invalidation_condition": "t",
+        },
+        "diagnosis_summary": {
+            "cycle_position": "trending_tr",
+            "direction": "bearish",
+            "key_signals": [],
+        },
+        "decision_trace": [],
+        "terminal": {"node_id": "11.3", "outcome": "trade", "label": "t"},
+    }
+
+
+def test_long_only_blocks_short_decision() -> None:
+    """long_only=True 时，order_direction=做空 的 decision 被强制改为不下单。"""
+    out = normalize_stage2(_long_only_short_obj(), long_only=True)
+    d = out["decision"]
+    assert d["order_type"] == "不下单"
+    assert d["order_direction"] is None
+    assert d["entry_price"] is None
+    assert d["stop_loss_price"] is None
+    assert d["take_profit_price"] is None
+    assert d["take_profit_price_2"] is None
+    assert "只做多守卫" in (d.get("reasoning") or "")
+
+
+def test_long_only_allows_long_decision() -> None:
+    """long_only=True 不影响做多决策。"""
+    obj = _long_only_short_obj()
+    obj["decision"] = {
+        **obj["decision"],
+        "order_direction": "做多",
+        "entry_price": 100.0,
+        "take_profit_price": 110.0,
+        "take_profit_price_2": 115.0,
+        "stop_loss_price": 95.0,
+    }
+    obj["diagnosis_summary"]["direction"] = "bullish"
+    out = normalize_stage2(obj, long_only=True)
+    d = out["decision"]
+    # 做多不被 long_only 守卫触发（方向可能被其他 guard 清，但绝不应是做空）
+    assert "只做多守卫" not in (d.get("reasoning") or "")
+    assert d.get("order_direction") != "做空"
+
+
+def test_long_only_default_false_keeps_short() -> None:
+    """不传 long_only（默认 False）时做空 decision 保持不变（向后兼容）。"""
+    out = normalize_stage2(_long_only_short_obj())
+    # long_only 未启用 → 守卫不触发（做空可能被其他 guard 改不下单，此处只验 long_only 未动）
+    assert "只做多守卫" not in (out["decision"].get("reasoning") or "")
+    assert out["decision"].get("order_type") in ("限价单", "不下单")
+
+
 def test_validator_injects_next_bar_when_feature_disabled() -> None:
     """skip_next_bar=True must not skip schema-required injection during validate()."""
     payload = {

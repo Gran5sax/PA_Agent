@@ -76,6 +76,8 @@ class GeneralSettings(BaseModel):
     incremental_max_new_bars: int = Field(default=10, ge=0, le=500)
     #: 阶段二交易倾向：balanced=默认；conservative/aggressive 逐级调整下单意愿
     decision_stance: DecisionStance = "balanced"
+    #: 只做多模式：开启后阶段二任何 order_direction=做空 的决策被强制改为不下单；prompt 同步注入多头偏好
+    long_only: bool = False
     #: 决策树可视化：在「整图适配」基础上的缩放百分比（100=与适配一致；可任意放大，仅下限 10%）
     decision_flow_default_zoom_pct: int = Field(default=600, ge=10)
     #: 「实时」页思考过程/撰写回答框与追问输入框的等宽字体字号（pt）

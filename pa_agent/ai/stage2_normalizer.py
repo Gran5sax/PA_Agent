@@ -1545,6 +1545,7 @@ def normalize_stage2(
     skip_next_bar: bool = False,
     previous_record: Any | None = None,
     structure_flip_cooldown_bars: int = 3,
+    long_only: bool = False,
 ) -> dict[str, Any]:
     """Return a copy of *obj* with decision_trace quirks corrected."""
     out = copy.deepcopy(obj)
@@ -1560,6 +1561,28 @@ def normalize_stage2(
     if isinstance(decision, dict):
         _truncate_decision_reasoning(decision)
     _normalize_stage2_enum_aliases(out)
+
+    # ── Hard guard: long_only forbids any short decision (early gate, before
+    # _coerce_decision_no_order clears order_direction on weak-trace shorts).
+    # Forces 做空 → 不下单 + clears price/direction fields + sets terminal=wait.
+    if long_only:
+        _lo_decision = out.get("decision")
+        if isinstance(_lo_decision, dict):
+            _lo_dir = str(_lo_decision.get("order_direction") or "")
+            if ("空" in _lo_dir) or (_lo_dir.lower() in ("short", "sell", "bearish")):
+                _lo_decision = dict(_lo_decision)
+                _clear_decision_to_no_order(_lo_decision)
+                _lo_existing = str(_lo_decision.get("reasoning") or "")
+                _lo_prefix = "【只做多守卫】long_only=true：禁止做空，已改为不下单。 "
+                _lo_decision["reasoning"] = (_lo_prefix + _lo_existing)[:DECISION_REASONING_MAX_LEN]
+                _lo_terminal = dict(out.get("terminal") or {})
+                _lo_terminal["outcome"] = "wait"
+                _lo_terminal["node_id"] = "long_only_guard"
+                _lo_terminal["label"] = "只做多守卫：禁止做空"
+                out = dict(out)
+                out["decision"] = _lo_decision
+                out["terminal"] = _lo_terminal
+
     _normalize_stage2_bar_analysis_enums(out, stage1_json=stage1_json)
     _coerce_decision_no_order(out)
     _repair_terminal_trade_node(out)

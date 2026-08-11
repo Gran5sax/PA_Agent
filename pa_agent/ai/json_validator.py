@@ -461,6 +461,7 @@ class JsonValidator:
         skip_next_bar: bool = False,
         previous_record: Any | None = None,
         structure_flip_cooldown_bars: int = 3,
+        long_only: bool = False,
     ) -> dict[str, Any]:
         """Apply the same post-parse normalization as :meth:`validate`."""
         norm_mode = getattr(self._validation, "normalization_mode", "strict")
@@ -489,6 +490,7 @@ class JsonValidator:
             skip_next_bar=False,
             previous_record=previous_record,
             structure_flip_cooldown_bars=structure_flip_cooldown_bars,
+            long_only=long_only,
         )
 
     def validate(
@@ -504,6 +506,7 @@ class JsonValidator:
         skip_next_bar: bool = False,
         previous_record: Any | None = None,
         structure_flip_cooldown_bars: int = 3,
+        long_only: bool = False,
     ) -> Result:
         """Validate *raw_text* against the schema for *stage*.
 
@@ -599,6 +602,7 @@ class JsonValidator:
             skip_next_bar=False if stage == "stage2" else skip_next_bar,
             previous_record=previous_record,
             structure_flip_cooldown_bars=structure_flip_cooldown_bars,
+            long_only=long_only,
         )
         norm_mode = getattr(self._validation, "normalization_mode", "strict")
 
